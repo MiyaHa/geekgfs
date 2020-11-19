@@ -61,6 +61,23 @@ public class ChunkServer extends UnicastRemoteObject implements ChunkServerProto
         return buffer;
     }
 
+    @Override
+    public void updateChunk(Chunk chunk, byte[] stream) throws Exception {
+        File file = new File(defaultFilePath + chunk.getChunkName());
+        byte[] buffer = new byte[chunk.getChunkSize() + stream.length];
+        try(FileInputStream fis = new FileInputStream(file)){
+            fis.read(buffer);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        System.arraycopy(stream, 0, buffer, chunk.getChunkSize(), stream.length);
+        try(FileOutputStream fos = new FileOutputStream(file)){
+            fos.write(buffer);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
 
     //Master2CS
     @Override

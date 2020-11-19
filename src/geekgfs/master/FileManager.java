@@ -99,25 +99,31 @@ public class FileManager {
                 return o1.getOrder() > o2.getOrder() ? 1 : -1;
             }
         });
-        for (ChunkInfo cki : chunkInfos){
-            map.put(cki.getChunk(),cki.getChunkServers());
+        for (ChunkInfo cki : chunkInfos) {
+            map.put(cki.getChunk(), cki.getChunkServers());
         }
         return map;
     }
 
-    public Map getLastChunk(String fileName){
+    public Map getLastChunk(String fileName) {
         FileInfo fileInfo = fileInfos.get(fileName);
         List<ChunkInfo> chunkInfos = fileInfo.getChunkInfos();
 
-        //按order进行排序
-        Collections.sort(chunkInfos, new Comparator<ChunkInfo>() {
-            @Override
-            public int compare(ChunkInfo o1, ChunkInfo o2) {
-                return o1.getOrder() > o2.getOrder() ? 1 : -1;
+        //获取order最大的chunkInfo
+        ChunkInfo chunkInfo = chunkInfos.get(0);
+        if (chunkInfos.size() > 1) {
+            for (int i = 1; i < chunkInfos.size(); i++) {
+                if (chunkInfos.get(i).getOrder() > chunkInfo.getOrder())
+                    chunkInfo = chunkInfos.get(i);
             }
-        });
-
-        ChunkInfo chunkInfo = chunkInfos.get(chunkInfos.size() - 1);
+        }
+//        Collections.sort(chunkInfos, new Comparator<ChunkInfo>() {
+//            @Override
+//            public int compare(ChunkInfo o1, ChunkInfo o2) {
+//                return o1.getOrder() > o2.getOrder() ? 1 : -1;
+//            }
+//        });
+//        ChunkInfo chunkInfo = chunkInfos.get(chunkInfos.size() - 1);
         Map<String, Object> map = new HashMap<>();
         map.put("chunk", chunkInfo.getChunk());
         map.put("chunkservers", chunkInfo.getChunkServers());
@@ -125,11 +131,17 @@ public class FileManager {
         return map;
     }
 
-    public void addChunkServer(String socket){
+    public void addChunkServer(String socket) {
         servers.add(socket);
     }
 
-    public void updateChunk(String fileName, int size, int order){
-        System.out.println("  ");
+    public void updateChunk(String fileName, int size, int order) {
+        FileInfo fileInfo = fileInfos.get(fileName);
+        List<ChunkInfo> chunkInfos = fileInfo.getChunkInfos();
+        for (ChunkInfo chunkInfo : chunkInfos){
+            if (chunkInfo.getOrder() == order){
+                chunkInfo.getChunk().setChunkSize(size);
+            }
+        }
     }
 }

@@ -1,7 +1,6 @@
-package geekgfs.file;
+package geekgfs.entity;
 
-import geekgfs.chunk.ChunkInfo;
-
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -9,7 +8,7 @@ import java.util.List;
  * 每个file对应一个List<ChunkInfo>
  */
 
-public class FileInfo {
+public class FileInfo implements Serializable {
 
     private String fileName;
     private List<ChunkInfo> chunkInfos;

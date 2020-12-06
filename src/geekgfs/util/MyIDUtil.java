@@ -43,13 +43,6 @@ public class MyIDUtil {
         return this.nextId(false, 0);
     }
 
-    /**
-     * 实际产生代码的
-     *
-     * @param isPadding
-     * @param busId
-     * @return
-     */
     private synchronized long nextId(boolean isPadding, long busId) {
 
         long timestamp = timeGen();

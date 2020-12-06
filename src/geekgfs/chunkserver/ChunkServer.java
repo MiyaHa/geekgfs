@@ -1,6 +1,6 @@
 package geekgfs.chunkserver;
 
-import geekgfs.chunk.Chunk;
+import geekgfs.entity.Chunk;
 import geekgfs.protocol.CS2MasterProtocol;
 import geekgfs.protocol.ChunkServerProtocol;
 import geekgfs.protocol.Master2CSProtocol;
@@ -19,8 +19,6 @@ public class ChunkServer extends UnicastRemoteObject implements ChunkServerProto
     private String serverSocket;
 
     private List<Long> chunkIDs;
-    //记录每个chunk的hash
-//    private Map<Long, String> chunkHash;
 
     //默认路径
     private String defaultFilePath = "";
@@ -28,23 +26,22 @@ public class ChunkServer extends UnicastRemoteObject implements ChunkServerProto
     public ChunkServer(String masterSocket) throws Exception {
         serverSocket = InetAddress.getLocalHost().getHostAddress();
         this.masterSocket = masterSocket;
-//        chunkHash = new ConcurrentHashMap<>();
         chunkIDs = new ArrayList<>();
     }
 
     @Override
-    public void addChunk(Chunk chunk, byte[] stream) throws Exception{
-        synchronized (chunkIDs){
+    public void addChunk(Chunk chunk, byte[] stream) throws Exception {
+        synchronized (chunkIDs) {
             chunkIDs.add(chunk.getChunkID());
         }
 
-        File file = new File(defaultFilePath+chunk.getChunkName());
-        synchronized(ChunkServer.class){
-            try(FileOutputStream fos = new FileOutputStream(file,true)){
+        File file = new File(defaultFilePath + chunk.getChunkName());
+        synchronized (ChunkServer.class) {
+            try (FileOutputStream fos = new FileOutputStream(file, true)) {
                 fos.write(stream);
-            }catch (Exception e){
+            } catch (Exception e) {
                 e.printStackTrace();
-                System.out.println("chunk: "+chunk.getChunkID()+"写入失败");
+                System.out.println("chunk: " + chunk.getChunkID() + "写入失败");
             }
         }
     }
@@ -53,9 +50,9 @@ public class ChunkServer extends UnicastRemoteObject implements ChunkServerProto
     public byte[] getChunk(Chunk chunk) throws Exception {
         File file = new File(defaultFilePath + chunk.getChunkName());
         byte[] buffer = new byte[chunk.getChunkSize()];
-        try(FileInputStream fis = new FileInputStream(file)){
+        try (FileInputStream fis = new FileInputStream(file)) {
             fis.read(buffer);
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
         return buffer;
@@ -65,15 +62,15 @@ public class ChunkServer extends UnicastRemoteObject implements ChunkServerProto
     public void updateChunk(Chunk chunk, byte[] stream) throws Exception {
         File file = new File(defaultFilePath + chunk.getChunkName());
         byte[] buffer = new byte[chunk.getChunkSize() + stream.length];
-        try(FileInputStream fis = new FileInputStream(file)){
+        try (FileInputStream fis = new FileInputStream(file)) {
             fis.read(buffer);
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
         System.arraycopy(stream, 0, buffer, chunk.getChunkSize(), stream.length);
-        try(FileOutputStream fos = new FileOutputStream(file)){
+        try (FileOutputStream fos = new FileOutputStream(file)) {
             fos.write(buffer);
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -82,12 +79,12 @@ public class ChunkServer extends UnicastRemoteObject implements ChunkServerProto
     //Master2CS
     @Override
     public void deleteChunk(Chunk chunk) {
-        File file = new File(defaultFilePath+chunk.getChunkName());
+        File file = new File(defaultFilePath + chunk.getChunkName());
         file.delete();
-        synchronized (chunkIDs){
-            try{
+        synchronized (chunkIDs) {
+            try {
                 chunkIDs.remove(chunk.getChunkID());
-            }catch (Exception e){
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }

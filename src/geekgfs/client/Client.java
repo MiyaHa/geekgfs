@@ -1,6 +1,6 @@
 package geekgfs.client;
 
-import geekgfs.chunk.Chunk;
+import geekgfs.entity.Chunk;
 import geekgfs.protocol.ChunkServerProtocol;
 import geekgfs.protocol.MasterProtocol;
 
@@ -18,18 +18,14 @@ public class Client {
 
     private int CHUNK_SIZE;
     //默认文件路径
-    private String defaultFilePath = "C:\\Users\\Bill Gates\\Desktop\\gfstest\\";
+    private String defaultFilePath = "";
     //master远程对象
     private MasterProtocol master;
-    //chunkserver远程对象
-    private ChunkServerProtocol chunkServer;
 
     public Client(String socket) throws Exception {
         //获取master远程对象
         master = (MasterProtocol) Naming.lookup("rmi://" + socket + "/master");
         System.out.println("master connect");
-        //chunkserver远程对象将在传输chunk之前获取
-        chunkServer = null;
         //获取chunk size
         CHUNK_SIZE = master.getDefaultChunkSize();
     }
@@ -62,11 +58,14 @@ public class Client {
     }
 
     public void uploadChunk(String fileName, int size, int order, byte[] stream) throws Exception {
-        //获取chunk以及对应的chunkserver
+
         Map<String, Object> map = master.chunking(fileName, size, order);
-        //获取chunkserver远程对象
-        chunkServer = (ChunkServerProtocol) Naming.lookup("rmi://" + map.get("chunkserver") + "/chunkserver");
-        chunkServer.addChunk((Chunk) map.get("chunk"), stream);
+        List<String> list = (List<String>) map.get("chunkservers");
+        for (String socket:
+             list) {
+            ChunkServerProtocol chunkServer = (ChunkServerProtocol) Naming.lookup("rmi://" + socket + "/chunkserver");
+            chunkServer.addChunk((Chunk) map.get("chunk"), stream);
+        }
     }
 
     public void append(String fileName, byte[] stream) throws Exception {
@@ -74,16 +73,24 @@ public class Client {
         Chunk chunk = (Chunk) map.get("chunk");
         List<String> list = (List<String>) map.get("chunkservers");
         int order = (int) map.get("order");
-        chunkServer = (ChunkServerProtocol) Naming.lookup("rmi://" + list.get(0) + "/chunkserver");
 
         if (chunk.getChunkSize() + stream.length <= CHUNK_SIZE) {
-            chunkServer.updateChunk(chunk, stream);
+            for (String socket:
+                 list) {
+                ChunkServerProtocol chunkServer = (ChunkServerProtocol) Naming.lookup("rmi://" + socket + "/chunkserver");
+                chunkServer.updateChunk(chunk, stream);
+            }
             master.updateChunk(fileName, chunk.getChunkSize() + stream.length, order);
         } else {
             int len = CHUNK_SIZE - chunk.getChunkSize();
             byte[] appendBytes = new byte[len];
             System.arraycopy(stream, 0, appendBytes, 0, len);
-            chunkServer.updateChunk(chunk, appendBytes);
+            for (String socket:
+                    list) {
+                byte[] finalAppendBytes = appendBytes;
+                ChunkServerProtocol chunkServer = (ChunkServerProtocol) Naming.lookup("rmi://" + socket + "/chunkserver");
+                chunkServer.updateChunk(chunk, finalAppendBytes);
+            }
             master.updateChunk(fileName, CHUNK_SIZE, order);
 
             while (len + CHUNK_SIZE < stream.length) {
@@ -117,8 +124,8 @@ public class Client {
 
         try (FileOutputStream fos = new FileOutputStream(file)) {
             for (Map.Entry<Chunk, List<String>> m : map.entrySet()) {
-                //默认从一个服务器下载
-                chunkServer = (ChunkServerProtocol) Naming.lookup("rmi://" + m.getValue().get(0) + "/chunkserver");
+                //默认从主副本服务器下载
+                ChunkServerProtocol chunkServer = (ChunkServerProtocol) Naming.lookup("rmi://" + m.getValue().get(0) + "/chunkserver");
                 fos.write(chunkServer.getChunk(m.getKey()));
             }
         } catch (Exception e) {
@@ -128,6 +135,10 @@ public class Client {
 
     public void downloadFile(String fileName) throws Exception {
         downloadFile(fileName, defaultFilePath);
+    }
+
+    public boolean exist(String fileName) throws Exception {
+        return master.exist(fileName);
     }
 
     public static void main(String[] args) throws Exception {
@@ -143,11 +154,11 @@ public class Client {
             switch (Integer.parseInt(num)) {
                 case 1:
                     client.uploadFile(fileName);
-                    System.out.println("success!");
+                    System.out.println("upload success!");
                     break;
                 case 2:
                     client.downloadFile(fileName);
-                    System.out.println("success!===");
+                    System.out.println("download success!");
             }
         }
     }

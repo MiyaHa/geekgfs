@@ -1,6 +1,6 @@
 package geekgfs.protocol;
 
-import geekgfs.chunk.Chunk;
+import geekgfs.entity.Chunk;
 
 import java.rmi.Remote;
 
@@ -11,6 +11,6 @@ import java.rmi.Remote;
 public interface Master2CSProtocol extends Remote {
 
     //删除chunk
-    void deleteChunk(Chunk chunk);
+    void deleteChunk(Chunk chunk) throws Exception;
 
 }

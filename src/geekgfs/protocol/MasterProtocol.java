@@ -1,6 +1,6 @@
 package geekgfs.protocol;
 
-import geekgfs.chunk.Chunk;
+import geekgfs.entity.Chunk;
 
 import java.rmi.Remote;
 import java.util.List;
@@ -29,4 +29,5 @@ public interface MasterProtocol extends Remote {
     //更新chunk
     void updateChunk(String fileName, int size, int order) throws Exception;
 
+    boolean exist(String fileName) throws Exception;
 }

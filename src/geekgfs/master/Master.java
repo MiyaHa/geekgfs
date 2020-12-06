@@ -1,6 +1,7 @@
 package geekgfs.master;
 
-import geekgfs.chunk.Chunk;
+import geekgfs.entity.Chunk;
+import geekgfs.master.thread.BackupThread;
 import geekgfs.protocol.CS2MasterProtocol;
 import geekgfs.protocol.MasterProtocol;
 
@@ -13,16 +14,19 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.List;
 import java.util.Map;
 
-public class Master extends UnicastRemoteObject implements MasterProtocol, CS2MasterProtocol {
+class Master extends UnicastRemoteObject implements MasterProtocol, CS2MasterProtocol {
 
-    //masterIP
+    //chunk size 固定为64KB
+    private static final int CHUNK_SIZE = 64*1024;
+    //master socket
     private String socket;
     private FileManager fileManager;
-    private static final int CHUNK_SIZE = 64*1024;
+    private BackupThread backupThread;
 
     public Master() throws Exception {
         socket = InetAddress.getLocalHost().getHostAddress();
         fileManager = FileManager.getInstance();
+        backupThread = new BackupThread(fileManager);
     }
 
     @Override
@@ -62,11 +66,16 @@ public class Master extends UnicastRemoteObject implements MasterProtocol, CS2Ma
         fileManager.updateChunk(fileName, size, order);
     }
 
+    @Override
+    public boolean exist(String fileName) {
+        return fileManager.exist(fileName);
+    }
+
     //CS2Master
     @Override
     public void addChunkServer(String socket) {
         fileManager.addChunkServer(socket);
-        System.out.println("chunkserver: " + socket + "has joined.");
+        System.out.println("chunkserver: " + socket + " has joined.");
     }
 
     public static void main(String[] args) throws Exception {

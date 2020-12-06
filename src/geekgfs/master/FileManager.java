@@ -1,11 +1,12 @@
 package geekgfs.master;
 
-import geekgfs.chunk.Chunk;
-import geekgfs.chunk.ChunkInfo;
-import geekgfs.file.FileInfo;
+import geekgfs.entity.Chunk;
+import geekgfs.entity.ChunkInfo;
+import geekgfs.entity.FileInfo;
 import geekgfs.protocol.Master2CSProtocol;
 import geekgfs.util.MyIDUtil;
 
+import java.io.*;
 import java.net.MalformedURLException;
 import java.rmi.Naming;
 import java.rmi.NotBoundException;
@@ -14,7 +15,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 由master运行的文件管理系统
+ * 由master运行的文件名称管理系统
  */
 
 public class FileManager {
@@ -28,23 +29,29 @@ public class FileManager {
     //IDUtil实例
     private MyIDUtil myIDUtil = MyIDUtil.getInstance();
 
+    //备份路径
+    private String backupPath = "";
+    //备份版本
+    private int baackupVer;
+
     private static FileManager instance = new FileManager();
 
-    public FileManager() {
+     FileManager() {
         fileInfos = new ConcurrentHashMap<>();
         servers = new ArrayList<>();
         serverInfo = new LinkedHashMap<>();
+        baackupVer = 0;
     }
 
-    public static FileManager getInstance() {
+     static FileManager getInstance() {
         return instance;
     }
 
-    public void addFileName(String fileName) {
+     void addFileName(String fileName) {
         fileInfos.put(fileName, new FileInfo(fileName));
     }
 
-    public Map<String, Object> chunking(String fileName, int size, int order) {
+     Map<String, Object> chunking(String fileName, int size, int order) {
         Map<String, Object> map = new HashMap<>();
         //使用generate()生成chunkID
         Chunk chunk = new Chunk(myIDUtil.generate(), size);
@@ -54,32 +61,44 @@ public class FileManager {
         fileInfo.addChunkInfo(chunkInfo);
         chunkInfo.setFileInfo(fileInfo);
 
-        //返回chunk和chunkserver到client，可做服务器负载均衡，这里直接返回chunkserver列表中的第一个
+        setChunkReplica(chunkInfo);
         map.put("chunk", chunk);
-        map.put("chunkserver", servers.get(0));
-        chunkInfo.addChunkServer(servers.get(0));
+        map.put("chunkservers", chunkInfo.getChunkServers());
         return map;
     }
 
-    public void deleteFile(String fileName) {
+     void setChunkReplica(ChunkInfo chunkInfo){
+        //为chunk分配chunkserver，此处简化处理，可做均衡负载
+        if (servers.size() > 0){
+            for (int i = 0; i < servers.size(); i++) {
+                chunkInfo.addReplica(servers.get(i));
+                if (i == 1)
+                    break;
+            }
+        }
+    }
+
+     void deleteFile(String fileName) {
         FileInfo fileInfo = fileInfos.get(fileName);
         List<ChunkInfo> chunkInfos = fileInfo.getChunkInfos();
-        for (ChunkInfo ci : chunkInfos) {
-            List<String> list = ci.getChunkServers();
+        for (ChunkInfo cki : chunkInfos) {
+            List<String> list = cki.getChunkServers();
             for (String socket : list) {
                 new Thread(() -> {
                     try {
                         Master2CSProtocol m2CS = (Master2CSProtocol) Naming.lookup("rmi://" + socket + "/chunkserver");
-                        m2CS.deleteChunk(ci.getChunk());
+                        m2CS.deleteChunk(cki.getChunk());
                         List<ChunkInfo> list1 = serverInfo.get(socket);
                         synchronized (list1) {
-                            list1.remove(ci);
+                            list1.remove(cki);
                         }
                     } catch (NotBoundException e) {
                         e.printStackTrace();
                     } catch (MalformedURLException e) {
                         e.printStackTrace();
                     } catch (RemoteException e) {
+                        e.printStackTrace();
+                    } catch (Exception e) {
                         e.printStackTrace();
                     }
                 }).start();
@@ -88,7 +107,7 @@ public class FileManager {
         fileInfos.remove(fileName);
     }
 
-    public Map<Chunk, List<String>> getChunks(String fileName) {
+     Map<Chunk, List<String>> getChunks(String fileName) {
         Map<Chunk, List<String>> map = new LinkedHashMap<>();
         FileInfo fileInfo = fileInfos.get(fileName);
         List<ChunkInfo> chunkInfos = fileInfo.getChunkInfos();
@@ -105,7 +124,7 @@ public class FileManager {
         return map;
     }
 
-    public Map getLastChunk(String fileName) {
+     Map getLastChunk(String fileName) {
         FileInfo fileInfo = fileInfos.get(fileName);
         List<ChunkInfo> chunkInfos = fileInfo.getChunkInfos();
 
@@ -119,7 +138,7 @@ public class FileManager {
         }
 //        Collections.sort(chunkInfos, new Comparator<ChunkInfo>() {
 //            @Override
-//            public int compare(ChunkInfo o1, ChunkInfo o2) {
+//             int compare(ChunkInfo o1, ChunkInfo o2) {
 //                return o1.getOrder() > o2.getOrder() ? 1 : -1;
 //            }
 //        });
@@ -131,17 +150,33 @@ public class FileManager {
         return map;
     }
 
-    public void addChunkServer(String socket) {
+     void addChunkServer(String socket) {
         servers.add(socket);
     }
 
-    public void updateChunk(String fileName, int size, int order) {
+     void updateChunk(String fileName, int size, int order) {
         FileInfo fileInfo = fileInfos.get(fileName);
         List<ChunkInfo> chunkInfos = fileInfo.getChunkInfos();
-        for (ChunkInfo chunkInfo : chunkInfos){
-            if (chunkInfo.getOrder() == order){
+        for (ChunkInfo chunkInfo : chunkInfos) {
+            if (chunkInfo.getOrder() == order) {
                 chunkInfo.getChunk().setChunkSize(size);
             }
+        }
+    }
+
+     boolean exist(String fileName){
+        return fileInfos.containsKey(fileName);
+    }
+
+    //备份
+    public void backup() {
+        File file = new File(backupPath + "\\ver_" + ++baackupVer + ".backup");
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(file))) {
+            oos.writeObject(fileInfos);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }

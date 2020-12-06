@@ -1,9 +1,9 @@
-package geekgfs.chunk;
+package geekgfs.entity;
 
 import java.io.Serializable;
 
 /**
- * GFS文件的基本单元--chunk实体类
+ * GFS文件的基本单元--chunk
  */
 
 public class Chunk implements Serializable {
